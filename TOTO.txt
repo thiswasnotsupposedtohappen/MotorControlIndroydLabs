@@ -1,0 +1,51 @@
+Goal:
+
+To build a windows application that will control a delta MS300 VFD motor drive using Modbus RTU.
+This application is a single window application that has the following entities on the main window:
+
+1.)Connection Section:
+This section has connection settings for the Modbus RTU communication. 
+Setting will be COM port number only. 
+There will be also be a connect button that will establish the connection to the VFD motor drive.
+
+2.)Control and status section:
+This section will have Start and Stop Button, to start and stop the program cycle.
+A status display for following parameters:
+- Connection status (Connected/Disconnected)
+- Program status (Running/Stopped)
+- Current program time in seconds
+- Current step number
+- Current motor rpm
+- Motor current in amps
+
+3.)Mode section.
+This section will have following configurations: "No of Seats", "Difficulty Level". 
+No of seats will do nothing it is for future use. You just need to create a dropdown menu for it with options "1", "2", "3", "4".
+Difficulty will have two options "Easy" and "Hard". Each difficulty will switch program profiles. So basically there will be only 2 profiles for each difficulty.
+
+4.)Profile Section.
+This section is basically a table that defines our motion profile.
+It will have rows "step no", "motor rpm", "duration in seconds", "absolute time in seconds", "sound file name".
+There will be 16 steps in total. Each row will represent a step in the motion profile.
+step no will be auto generated and will be read only.
+motor rpm will be the speed of the motor in rpm. It will be a number input field. it will be between 0 and 1440 rpm.
+duration in seconds will be the duration of the step in seconds. It will be a number input field. it will be between 0 and 600 seconds.
+absolute time in seconds will be the cumulative time of the step. It will be auto generated and read only.
+sound file name will be the name of the sound file that will be played at the beginning of the current step. It will be a text input field.
+
+Notes:- 
+The application should be able to save and load everything in a binary file. This includes connection settings, mode settings and profile settings.
+Code is C/C++ only I have prepared a basic structure of the application. I have also prepared Modbus communication struct and functions. UART code is still to be implemented. Please check if there arent any bugs in the code I have prepared. You can also add any additional functions or structs that you think are necessary for the application.
+I suggest we use native windows UI API for maximum compatibility.
+Coding conventions: PascalCase for functions, stuct/class names. Eveything else is small case. Using undersocre is allowed.
+
+Motor is max 1440 rpm motor which is achived at 50Hz.
+Modebus RTU communtication will have settings: baud rate: 9600, data bits: 8, parity: none, stop bits: 1.
+Modbus related info: 
+VFD slave id = 1
+bytes to read write is always 4 bytes.
+VFD start write command: address 0x2000 value (BIT04 | BIT01)
+VFD stop  write command: address 0x2000 value (BIT00)
+VFD freq write command: address 0x2001 value frequency in Hz * 100 (for example for 50Hz you will write 5000)
+VFD freq read command: address 0x2103 value will be frequency in Hz * 100 (for example for 50Hz it will return 5000)
+VFD current read command: address 0x2104 (this will return the current in amps * 100)
