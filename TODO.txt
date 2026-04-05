@@ -38,7 +38,6 @@ The application should be able to save and load everything in a binary file. Thi
 Code is C/C++ only I have prepared a basic structure of the application. I have also prepared Modbus communication struct and functions. UART code is still to be implemented. Please check if there arent any bugs in the code I have prepared. You can also add any additional functions or structs that you think are necessary for the application.
 I suggest we use native windows UI API for maximum compatibility.
 Coding conventions: PascalCase for functions, stuct/class names. Eveything else is small case. Using undersocre is allowed.
-
 Motor is max 1440 rpm motor which is achived at 50Hz.
 Modebus RTU communtication will have settings: baud rate: 9600, data bits: 8, parity: none, stop bits: 1.
 Modbus related info: 
