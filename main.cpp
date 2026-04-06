@@ -77,15 +77,17 @@
 // ============================================================================
 #define MAX_STEPS           16
 #define MAX_SOUND_PATH      260
-#define MAX_RPM             1440
+#define MAX_RPM             1728
 #define MAX_DURATION        600
-#define MAX_FREQ_HZ         50.0
+#define MAX_FREQ_HZ         60
 #define VFD_SLAVE_ID        1
 #define VFD_ADDR_CONTROL    0x2000
 #define VFD_ADDR_FREQ_WRITE 0x2001
+#define VFD_ADDR_RESET      0x2002
 #define VFD_ADDR_FREQ_READ  0x2103
 #define VFD_ADDR_CURRENT    0x2104
 #define VFD_ADDR_VOLTAGE    0x2105
+#define VFD_CMD_RESET       (int16)(BIT01)
 #define VFD_CMD_START       (int16)(BIT04 | BIT01)
 #define VFD_CMD_STOP        (int16)(BIT00)
 
@@ -863,6 +865,13 @@ void StartProgram()
     if (current_step < 0)
     {
         MessageBoxW(g_hwnd, L"All steps have zero duration. Nothing to run.", L"Error", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Send VFD Reset command
+    if (modbus.Write(VFD_SLAVE_ID, VFD_ADDR_RESET, VFD_CMD_RESET) != 0)
+    {
+        MessageBoxW(g_hwnd, L"Failed to send start command to VFD.", L"Error", MB_OK | MB_ICONERROR);
         return;
     }
 
