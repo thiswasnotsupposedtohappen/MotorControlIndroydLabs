@@ -85,11 +85,14 @@
 #define VFD_ADDR_FREQ_WRITE 0x2001
 #define VFD_ADDR_FREQ_READ  0x2103
 #define VFD_ADDR_CURRENT    0x2104
+#define VFD_ADDR_VOLTAGE    0x2105
 #define VFD_CMD_START       (int16)(BIT04 | BIT01)
 #define VFD_CMD_STOP        (int16)(BIT00)
 
 #define TIMER_PROGRAM       1
 #define TIMER_PROGRAM_MS    500
+#define TIMER_STATUS        2
+#define TIMER_STATUS_MS     100
 
 // Control IDs
 #define IDC_COM_PORT        1001
@@ -108,6 +111,7 @@
 #define IDC_STATUS_STEP     1013
 #define IDC_STATUS_RPM      1014
 #define IDC_STATUS_CURRENT  1015
+#define IDC_STATUS_VOLTAGE  1016
 
 #define IDC_RPM_BASE        1100
 #define IDC_DUR_BASE        1200
@@ -394,6 +398,7 @@ static HWND g_hwnd_status_time;
 static HWND g_hwnd_status_step;
 static HWND g_hwnd_status_rpm;
 static HWND g_hwnd_status_current;
+static HWND g_hwnd_status_voltage;
 
 static HWND g_hwnd_rpm[MAX_STEPS];
 static HWND g_hwnd_dur[MAX_STEPS];
@@ -512,22 +517,18 @@ void SetDefaultProfiles()
     strcpy_s(settings.com_port, sizeof(settings.com_port), "");
 
     // Easy profile
-    int easy_rpm[MAX_STEPS]  = {   0, 200, 400, 600, 720, 600, 400, 200,   0, 0, 0, 0, 0, 0, 0, 0 };
-    int easy_dur[MAX_STEPS]  = {   5,  10,  15,  20,  25,  20,  15,  10,   5, 0, 0, 0, 0, 0, 0, 0 };
     for (int i = 0; i < MAX_STEPS; i++)
     {
-        settings.profiles[0][i].motor_rpm = easy_rpm[i];
-        settings.profiles[0][i].duration = easy_dur[i];
+        settings.profiles[0][i].motor_rpm = 0;
+        settings.profiles[0][i].duration = 0;
         settings.profiles[0][i].sound_file[0] = '\0';
     }
 
     // Hard profile
-    int hard_rpm[MAX_STEPS]  = {    0,  360,  720, 1080, 1440, 1080, 1440,  720, 360,   0, 0, 0, 0, 0, 0, 0 };
-    int hard_dur[MAX_STEPS]  = {    3,    8,   12,   15,   20,   15,   18,   12,   8,   5, 0, 0, 0, 0, 0, 0 };
     for (int i = 0; i < MAX_STEPS; i++)
     {
-        settings.profiles[1][i].motor_rpm = hard_rpm[i];
-        settings.profiles[1][i].duration = hard_dur[i];
+        settings.profiles[1][i].motor_rpm = 0;
+        settings.profiles[1][i].duration = 0;
         settings.profiles[1][i].sound_file[0] = '\0';
     }
 }
@@ -555,7 +556,13 @@ void UpdateProfileTableFromSettings()
 
         wchar_t wsnd[MAX_SOUND_PATH];
         MultiByteToWideChar(CP_ACP, 0, settings.profiles[diff][i].sound_file, -1, wsnd, MAX_SOUND_PATH);
-        SetWindowTextW(g_hwnd_snd[i], wsnd);
+        // Display only the filename, not the full path
+        const wchar_t* filename_only = wcsrchr(wsnd, L'\\');
+        if (filename_only)
+            filename_only++;
+        else
+            filename_only = wsnd;
+        SetWindowTextW(g_hwnd_snd[i], filename_only);
     }
 }
 
@@ -579,9 +586,8 @@ void ReadProfileTableToSettings()
         if (settings.profiles[diff][i].duration < 0) settings.profiles[diff][i].duration = 0;
         if (settings.profiles[diff][i].duration > MAX_DURATION) settings.profiles[diff][i].duration = MAX_DURATION;
 
-        wchar_t wsnd[MAX_SOUND_PATH];
-        GetWindowTextW(g_hwnd_snd[i], wsnd, MAX_SOUND_PATH);
-        WideCharToMultiByte(CP_ACP, 0, wsnd, -1, settings.profiles[diff][i].sound_file, MAX_SOUND_PATH, NULL, NULL);
+        // Sound file path is stored directly in settings when browsing,
+        // so we do not read it from the UI (which only shows the filename).
     }
 }
 
@@ -627,6 +633,8 @@ void SetProfileControlsEnabled(bool enabled)
 // ============================================================================
 void UpdateStatusDisplay()
 {
+    wchar_t buf[64];
+
     SetWindowTextW(g_hwnd_status_conn, modbus.connected ? L"Connected" : L"Disconnected");
     SetWindowTextW(g_hwnd_status_prog, program_running ? L"Running" : L"Stopped");
 
@@ -634,40 +642,62 @@ void UpdateStatusDisplay()
     {
         DWORD elapsed_ms = GetTickCount() - program_start_tick;
         int32 elapsed_sec = (int32)(elapsed_ms / 1000);
-        wchar_t buf[64];
 
-        _snwprintf_s(buf, 64, L"%d", elapsed_sec);
+        _snwprintf_s(buf, 64, L"%d s", elapsed_sec);
         SetWindowTextW(g_hwnd_status_time, buf);
 
         _snwprintf_s(buf, 64, L"%d", current_step + 1);
         SetWindowTextW(g_hwnd_status_step, buf);
-
-        // Read actual RPM and current from VFD
-        if (modbus.connected)
-        {
-            int16 freq_val = 0;
-            if (modbus.Read(VFD_SLAVE_ID, VFD_ADDR_FREQ_READ, freq_val) == 0)
-            {
-                int32 rpm = FreqValueToRpm(freq_val);
-                _snwprintf_s(buf, 64, L"%d", rpm);
-                SetWindowTextW(g_hwnd_status_rpm, buf);
-            }
-
-            int16 current_val = 0;
-            if (modbus.Read(VFD_SLAVE_ID, VFD_ADDR_CURRENT, current_val) == 0)
-            {
-                float64 amps = (float64)current_val / 100.0;
-                _snwprintf_s(buf, 64, L"%.2f A", amps);
-                SetWindowTextW(g_hwnd_status_current, buf);
-            }
-        }
     }
     else
     {
-        SetWindowTextW(g_hwnd_status_time, L"0");
+        SetWindowTextW(g_hwnd_status_time, L"0 s");
         SetWindowTextW(g_hwnd_status_step, L"0");
-        SetWindowTextW(g_hwnd_status_rpm, L"0");
+    }
+
+    if (modbus.connected)
+    {
+        int16 freq_val = 0;
+        if (modbus.Read(VFD_SLAVE_ID, VFD_ADDR_FREQ_READ, freq_val) == 0)
+        {
+            float64 rpm = ((float64)freq_val / 100.0 / MAX_FREQ_HZ) * (float64)MAX_RPM;
+            _snwprintf_s(buf, 64, L"%.2f RPM", rpm);
+            SetWindowTextW(g_hwnd_status_rpm, buf);
+        }
+        else
+        {
+            SetWindowTextW(g_hwnd_status_rpm, L"N/A");
+		}
+
+        int16 current_val = 0;
+        if (modbus.Read(VFD_SLAVE_ID, VFD_ADDR_CURRENT, current_val) == 0)
+        {
+            float64 amps = (float64)current_val / 100.0;
+            _snwprintf_s(buf, 64, L"%.2f A", amps);
+            SetWindowTextW(g_hwnd_status_current, buf);
+        }
+        else
+        {
+            SetWindowTextW(g_hwnd_status_current, L"N/A");
+        }
+
+        int16 voltage_val = 0;
+        if (modbus.Read(VFD_SLAVE_ID, VFD_ADDR_VOLTAGE, voltage_val) == 0)
+        {
+            float64 volts = (float64)voltage_val / 10.0;
+            _snwprintf_s(buf, 64, L"%.2f V", volts);
+            SetWindowTextW(g_hwnd_status_voltage, buf);
+        }
+        else
+        {
+            SetWindowTextW(g_hwnd_status_voltage, L"N/A");
+		}
+    }
+    else
+    {
+        SetWindowTextW(g_hwnd_status_rpm, L"0.00 RPM");
         SetWindowTextW(g_hwnd_status_current, L"0.00 A");
+        SetWindowTextW(g_hwnd_status_voltage, L"0.00 V");
     }
 }
 
@@ -787,7 +817,17 @@ void BrowseSoundFile(HWND hwnd, int step_index)
 
     if (GetOpenFileNameW(&ofn))
     {
-        SetWindowTextW(g_hwnd_snd[step_index], filename);
+        // Store full path in settings
+        int diff = settings.difficulty;
+        WideCharToMultiByte(CP_ACP, 0, filename, -1, settings.profiles[diff][step_index].sound_file, MAX_SOUND_PATH, NULL, NULL);
+
+        // Display only the filename
+        const wchar_t* name_only = wcsrchr(filename, L'\\');
+        if (name_only)
+            name_only++;
+        else
+            name_only = filename;
+        SetWindowTextW(g_hwnd_snd[step_index], name_only);
     }
 }
 
@@ -927,8 +967,6 @@ void OnProgramTimer()
     {
         AdvanceToNextStep();
     }
-
-    UpdateStatusDisplay();
 }
 
 // ============================================================================
@@ -996,68 +1034,82 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         // ---- Control & Status Section ----
         CreateWindowW(L"BUTTON", L"Control && Status", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-            5, 110, 785, 85, hwnd, NULL, g_hinst, NULL);
+            5, 110, 785, 80, hwnd, NULL, g_hinst, NULL);
 
         g_hwnd_start = CreateWindowW(L"BUTTON", L"START",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            15, 130, 90, 30, hwnd, (HMENU)IDC_START, g_hinst, NULL);
+            15, 130, 80, 26, hwnd, (HMENU)IDC_START, g_hinst, NULL);
 
         g_hwnd_stop = CreateWindowW(L"BUTTON", L"STOP",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_DISABLED,
-            115, 130, 90, 30, hwnd, (HMENU)IDC_STOP, g_hinst, NULL);
+            100, 130, 80, 26, hwnd, (HMENU)IDC_STOP, g_hinst, NULL);
 
-        // Status row 1
-        CreateWindowW(L"STATIC", L"Connection:", WS_CHILD | WS_VISIBLE,
-            220, 128, 80, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_conn = CreateWindowW(L"STATIC", L"Disconnected",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            305, 128, 110, 18, hwnd, (HMENU)IDC_STATUS_CONN, g_hinst, NULL);
+        // Status table headers
+        {
+            int sx = 190;
+            int sh = 18;
+            int sy_hdr = 128;
+            int sy_val = 148;
+            int col_w[] = { 85, 70, 55, 45, 90, 65, 75 };
 
-        CreateWindowW(L"STATIC", L"Program:", WS_CHILD | WS_VISIBLE,
-            430, 128, 65, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_prog = CreateWindowW(L"STATIC", L"Stopped",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            500, 128, 100, 18, hwnd, (HMENU)IDC_STATUS_PROG, g_hinst, NULL);
+            const wchar_t* headers[] = { L"Connection", L"Program", L"Time", L"Step", L"Motor RPM", L"Current", L"Voltage" };
+            for (int i = 0; i < 7; i++)
+            {
+                CreateWindowW(L"STATIC", headers[i], WS_CHILD | WS_VISIBLE | SS_CENTER,
+                    sx, sy_hdr, col_w[i], sh, hwnd, NULL, g_hinst, NULL);
+                sx += col_w[i] + 5;
+            }
 
-        // Status row 2
-        CreateWindowW(L"STATIC", L"Time(s):", WS_CHILD | WS_VISIBLE,
-            220, 150, 55, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_time = CreateWindowW(L"STATIC", L"0",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            280, 150, 50, 18, hwnd, (HMENU)IDC_STATUS_TIME, g_hinst, NULL);
+            sx = 190;
+            g_hwnd_status_conn = CreateWindowW(L"EDIT", L"Disconnected",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[0], 22, hwnd, (HMENU)IDC_STATUS_CONN, g_hinst, NULL);
+            sx += col_w[0] + 5;
 
-        CreateWindowW(L"STATIC", L"Step:", WS_CHILD | WS_VISIBLE,
-            340, 150, 40, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_step = CreateWindowW(L"STATIC", L"0",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            385, 150, 40, 18, hwnd, (HMENU)IDC_STATUS_STEP, g_hinst, NULL);
+            g_hwnd_status_prog = CreateWindowW(L"EDIT", L"Stopped",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[1], 22, hwnd, (HMENU)IDC_STATUS_PROG, g_hinst, NULL);
+            sx += col_w[1] + 5;
 
-        CreateWindowW(L"STATIC", L"Motor RPM:", WS_CHILD | WS_VISIBLE,
-            440, 150, 75, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_rpm = CreateWindowW(L"STATIC", L"0",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            520, 150, 55, 18, hwnd, (HMENU)IDC_STATUS_RPM, g_hinst, NULL);
+            g_hwnd_status_time = CreateWindowW(L"EDIT", L"0 s",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[2], 22, hwnd, (HMENU)IDC_STATUS_TIME, g_hinst, NULL);
+            sx += col_w[2] + 5;
 
-        CreateWindowW(L"STATIC", L"Current:", WS_CHILD | WS_VISIBLE,
-            590, 150, 55, 18, hwnd, NULL, g_hinst, NULL);
-        g_hwnd_status_current = CreateWindowW(L"STATIC", L"0.00 A",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            650, 150, 70, 18, hwnd, (HMENU)IDC_STATUS_CURRENT, g_hinst, NULL);
+            g_hwnd_status_step = CreateWindowW(L"EDIT", L"0",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[3], 22, hwnd, (HMENU)IDC_STATUS_STEP, g_hinst, NULL);
+            sx += col_w[3] + 5;
+
+            g_hwnd_status_rpm = CreateWindowW(L"EDIT", L"0.00 RPM",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[4], 22, hwnd, (HMENU)IDC_STATUS_RPM, g_hinst, NULL);
+            sx += col_w[4] + 5;
+
+            g_hwnd_status_current = CreateWindowW(L"EDIT", L"0.00 A",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[5], 22, hwnd, (HMENU)IDC_STATUS_CURRENT, g_hinst, NULL);
+            sx += col_w[5] + 5;
+
+            g_hwnd_status_voltage = CreateWindowW(L"EDIT", L"0.00 V",
+                WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY | ES_CENTER,
+                sx, sy_val, col_w[6], 22, hwnd, (HMENU)IDC_STATUS_VOLTAGE, g_hinst, NULL);
+        }
 
         // ---- Profile Section ----
         CreateWindowW(L"BUTTON", L"Profile", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-            5, 200, 785, 480, hwnd, NULL, g_hinst, NULL);
+            5, 195, 785, 485, hwnd, NULL, g_hinst, NULL);
 
         g_hwnd_save = CreateWindowW(L"BUTTON", L"Save",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            15, 218, 80, 26, hwnd, (HMENU)IDC_SAVE, g_hinst, NULL);
+            15, 213, 80, 26, hwnd, (HMENU)IDC_SAVE, g_hinst, NULL);
 
         g_hwnd_load = CreateWindowW(L"BUTTON", L"Load",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            105, 218, 80, 26, hwnd, (HMENU)IDC_LOAD, g_hinst, NULL);
+            105, 213, 80, 26, hwnd, (HMENU)IDC_LOAD, g_hinst, NULL);
 
         // Table headers
-        y = 250;
+        y = 245;
         CreateWindowW(L"STATIC", L"Step", WS_CHILD | WS_VISIBLE | SS_CENTER,
             15, y, 35, 18, hwnd, NULL, g_hinst, NULL);
         CreateWindowW(L"STATIC", L"Motor RPM", WS_CHILD | WS_VISIBLE | SS_CENTER,
@@ -1070,7 +1122,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             355, y, 355, 18, hwnd, NULL, g_hinst, NULL);
 
         // Table rows
-        y = 270;
+        y = 265;
         for (int i = 0; i < MAX_STEPS; i++)
         {
             int row_y = y + i * 25;
@@ -1128,6 +1180,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (modbus.connected)
             {
                 if (program_running) StopProgram();
+                KillTimer(hwnd, TIMER_STATUS);
                 modbus.Close();
                 SetWindowTextW(g_hwnd_connect, L"Connect");
                 EnableWindow(g_hwnd_com_port, TRUE);
@@ -1147,6 +1200,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     strcpy_s(settings.com_port, sizeof(settings.com_port), g_com_ports[sel].port_name);
                     SetWindowTextW(g_hwnd_connect, L"Disconnect");
                     EnableWindow(g_hwnd_com_port, FALSE);
+                    SetTimer(hwnd, TIMER_STATUS, TIMER_STATUS_MS, NULL);
                     UpdateStatusDisplay();
                 }
                 else
@@ -1208,6 +1262,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             OnProgramTimer();
         }
+        if (wParam == TIMER_STATUS)
+        {
+            UpdateStatusDisplay();
+        }
         break;
     }
 
@@ -1219,6 +1277,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (result != IDYES) break;
             StopProgram();
         }
+        KillTimer(hwnd, TIMER_STATUS);
         modbus.Close();
         DestroyWindow(hwnd);
         break;
