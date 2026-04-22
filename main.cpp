@@ -408,6 +408,7 @@ struct AppSettings
     char com_port[64];
     int32 num_seats;
     int32 difficulty;
+    int32 total_rides;
     ProfileStep profiles[2][MAX_STEPS];
 };
 
@@ -547,7 +548,7 @@ void SendProfileToWeb()
     if (!g_webview) return;
     int diff = settings.difficulty;
 
-    std::wstring json = L"{\"type\":\"LOAD_PROFILE\",\"difficulty\":" + std::to_wstring(diff) + L",\"seats\":" + std::to_wstring(settings.num_seats) + L",\"profile\":[";
+    std::wstring json = L"{\"type\":\"LOAD_PROFILE\",\"difficulty\":" + std::to_wstring(diff) + L",\"seats\":" + std::to_wstring(settings.num_seats) + L",\"total_rides\":" + std::to_wstring(settings.total_rides) + L",\"profile\":[";
     for (int i = 0; i < MAX_STEPS; i++)
     {
         wchar_t wsnd[MAX_SOUND_PATH];
@@ -583,6 +584,7 @@ void SetDefaultProfiles()
     memset(&settings, 0, sizeof(settings));
     settings.num_seats = 1;
     settings.difficulty = 0;
+    settings.total_rides = 0;
     strcpy_s(settings.com_port, sizeof(settings.com_port), "");
 
     for (int d = 0; d < 2; d++) 
@@ -878,6 +880,13 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
     }
     else if (message.find(L"\"type\":\"START\"") != std::string::npos) 
     {
+        // Increment total rides on start
+        settings.total_rides++;
+        SaveSettings();
+        
+        // Notify webview of new total
+        SendProfileToWeb();
+
         // Here we would ideally parse the updated profile from the message,
         // but for simplicity, we assume the user saves/updates state regularly or we extract it.
         // Let's assume the Start message includes the profile.

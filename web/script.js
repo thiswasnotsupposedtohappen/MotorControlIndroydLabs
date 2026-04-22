@@ -2,6 +2,7 @@ const MAX_STEPS = 16;
 const MAX_RPM = 1728;
 
 // State management
+let manualDateOverride = false;
 let currentProfile = Array.from({ length: MAX_STEPS }, (_, i) =>
 ({
     motor_rpm: 0,
@@ -19,7 +20,47 @@ document.addEventListener('DOMContentLoaded', () =>
     
     // Initial request for settings and COM ports
     postToCpp({ type: 'GET_INITIAL_DATA' });
+
+    // Load persisted date if available
+    const savedDate = localStorage.getItem('selectedDate');
+    if (savedDate) {
+        manualDateOverride = true;
+        updateDate(new Date(savedDate));
+    } else {
+        updateDate();
+    }
+
+    // Start date updater
+    const dateInterval = setInterval(() => {
+        if (!manualDateOverride) {
+            updateDate();
+        } else {
+            clearInterval(dateInterval);
+        }
+    }, 60000); // Every minute
 });
+
+function updateDate(dateObj = new Date()) 
+{
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = days[dateObj.getDay()];
+    const dateStr = dateObj.toLocaleDateString('en-GB'); // dd/mm/yyyy
+
+    const dayEl = document.getElementById('displayDay');
+    const dateEl = document.getElementById('displayDate');
+    const pickerEl = document.getElementById('datePicker');
+
+    if (dayEl) dayEl.textContent = dayName;
+    if (dateEl) dateEl.textContent = dateStr;
+    
+    if (pickerEl) {
+        // format as yyyy-mm-dd for input
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        pickerEl.value = `${yyyy}-${mm}-${dd}`;
+    }
+}
 
 function generateProfileRows() 
 {
@@ -65,20 +106,56 @@ function setupEventListeners()
         });
     }
 
-    // Configuration
-    const numSeats = document.getElementById('numSeats');
-    if (numSeats) {
-        numSeats.addEventListener('change', (e) => {
-            postToCpp({ type: 'SET_SEATS', value: parseInt(e.target.value) });
+    // Configuration (Buttons)
+    const seatsGroup = document.getElementById('seatsGroup');
+    if (seatsGroup) {
+        seatsGroup.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-toggle');
+            if (btn) {
+                const val = parseInt(btn.dataset.value);
+                setActiveInGroup(seatsGroup, val);
+                postToCpp({ type: 'SET_SEATS', value: val });
+            }
         });
     }
 
-    const difficulty = document.getElementById('difficulty');
-    if (difficulty) {
-        difficulty.addEventListener('change', (e) => {
-            readProfileFromUI();
-            postToCpp({ type: 'SET_DIFFICULTY', value: parseInt(e.target.value) });
+    const difficultyGroup = document.getElementById('difficultyGroup');
+    if (difficultyGroup) {
+        difficultyGroup.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-toggle');
+            if (btn) {
+                const val = parseInt(btn.dataset.value);
+                setActiveInGroup(difficultyGroup, val);
+                if (document.getElementById('profileTable')) {
+                    readProfileFromUI();
+                }
+                postToCpp({ type: 'SET_DIFFICULTY', value: val });
+            }
         });
+    }
+
+    const datePicker = document.getElementById('datePicker');
+    if (datePicker) {
+        datePicker.addEventListener('change', (e) => {
+            if (e.target.value) {
+                manualDateOverride = true;
+                localStorage.setItem('selectedDate', e.target.value);
+                const newDate = new Date(e.target.value);
+                updateDate(newDate);
+            }
+        });
+
+        // Explicitly trigger the picker when the card is clicked
+        const dateCard = document.getElementById('dateCard');
+        if (dateCard) {
+            dateCard.addEventListener('click', () => {
+                if (typeof datePicker.showPicker === 'function') {
+                    datePicker.showPicker();
+                } else {
+                    datePicker.click();
+                }
+            });
+        }
     }
 
     // Control
@@ -128,6 +205,18 @@ function setupEventListeners()
             }
         });
     }
+}
+
+function setActiveInGroup(group, value) 
+{
+    const buttons = group.querySelectorAll('.btn-toggle');
+    buttons.forEach(btn => {
+        if (parseInt(btn.dataset.value) === value) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
 }
 
 function readProfileFromUI() 
@@ -202,11 +291,26 @@ function handleCppMessage(msg)
             updateComPorts(msg.ports, msg.selected);
             break;
         case 'LOAD_PROFILE':
-            updateProfileUI(msg.profile, msg.difficulty, msg.seats);
+            updateProfileUI(msg.profile, msg.difficulty, msg.seats, msg.total_rides);
             break;
         case 'SOUND_SELECTED':
             updateSoundFile(msg.index, msg.path, msg.filename);
             break;
+    }
+}
+
+function updateTotalRides(count) 
+{
+    const el = document.getElementById('totalRides');
+    if (!el) return;
+    
+    // Convert to string and ensure at least 3 digits
+    const str = count.toString().padStart(3, '0');
+    el.innerHTML = '';
+    for (const char of str) {
+        const span = document.createElement('span');
+        span.textContent = char;
+        el.appendChild(span);
     }
 }
 
@@ -263,6 +367,15 @@ function updateStatus(data)
     
     const btnStop = document.getElementById('btnStop');
     if (btnStop) btnStop.disabled = !data.running;
+
+    const btnBack = document.getElementById('btnBack');
+    if (btnBack) {
+        if (data.running) {
+            btnBack.classList.add('disabled');
+        } else {
+            btnBack.classList.remove('disabled');
+        }
+    }
     
     const btnConnect = document.getElementById('btnConnect');
     if (btnConnect) btnConnect.textContent = data.connected ? 'DISCONNECT' : 'CONNECT';
@@ -292,13 +405,15 @@ function updateComPorts(ports, selected)
     });
 }
 
-function updateProfileUI(profile, difficulty, seats) 
+function updateProfileUI(profile, difficulty, seats, totalRides) 
 {
-    const difficultyEl = document.getElementById('difficulty');
-    if (difficultyEl) difficultyEl.value = difficulty;
+    const difficultyGroup = document.getElementById('difficultyGroup');
+    if (difficultyGroup) setActiveInGroup(difficultyGroup, difficulty);
     
-    const numSeatsEl = document.getElementById('numSeats');
-    if (numSeatsEl) numSeatsEl.value = seats;
+    const seatsGroup = document.getElementById('seatsGroup');
+    if (seatsGroup) setActiveInGroup(seatsGroup, seats);
+    
+    if (totalRides !== undefined) updateTotalRides(totalRides);
     
     currentProfile = profile;
     const rpms = document.querySelectorAll('.rpm-input');

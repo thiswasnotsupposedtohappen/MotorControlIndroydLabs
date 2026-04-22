@@ -24,6 +24,7 @@
                 </div>
                 <button id="btnConnect" class="btn secondary">CONNECT</button>
                 <button id="btnRefresh" class="btn icon" title="Refresh COM Ports">⟳</button>
+                <a href="program.html" id="btnSettings" class="btn icon" title="Configure Motion Profile">⚙</a>
             </div>
         </header>
 
@@ -73,54 +74,60 @@
                 </div>
             </section>
 
-            <section class="controls-config-grid">
+            <section class="main-content-area">
                 <div class="config-panel glass">
-                    <h3>SYSTEM CONFIGURATION</h3>
-                    <div class="config-row">
-                        <div class="input-group">
-                            <label>NO. OF SEATS</label>
-                            <select id="numSeats">
-                                <option value="1">1 Seat</option>
-                                <option value="2">2 Seats</option>
-                                <option value="3">3 Seats</option>
-                                <option value="4">4 Seats</option>
-                            </select>
+                    <div class="config-grid">
+                        <!-- Persons -->
+                        <div class="config-item">
+                            <label>NO.of Persons</label>
+                            <div class="button-group" id="seatsGroup">
+                                <button class="btn-toggle" data-value="1">1</button>
+                                <button class="btn-toggle" data-value="2">2</button>
+                                <button class="btn-toggle" data-value="3">3</button>
+                                <button class="btn-toggle" data-value="4">4</button>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <label>DIFFICULTY</label>
-                            <select id="difficulty">
-                                <option value="0">EASY MODE</option>
-                                <option value="1">HARD MODE</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="action-buttons">
-                        <a href="run.html" class="btn primary large">NEXT</a>
-                    </div>
-                </div>
 
-                <div class="profile-panel glass">
-                    <div class="panel-header">
-                        <h3>MOTION PROFILE</h3>
-                        <span class="badge">16 STEPS</span>
+                        <!-- Spacer for Grid alignment -->
+                        <div></div>
+
+                        <div class="config-item date-item">
+                            <div class="date-card glass" id="dateCard">
+                                <div id="displayDay">Loading...</div>
+                                <div id="displayDate">--/--/----</div>
+                                <input type="date" id="datePicker">
+                            </div>
+                        </div>
+
+                        <!-- Type of Ride -->
+                        <div class="config-item">
+                            <label>Type of Ride</label>
+                            <div class="button-group" id="difficultyGroup">
+                                <button class="btn-toggle" data-value="0">Normal</button>
+                                <button class="btn-toggle" data-value="1">HighThrill</button>
+                            </div>
+                        </div>
+
+                        <!-- Spacer for Grid alignment -->
+                        <div></div>
+                        
+                        <!-- Total Rides -->
+                        <div class="config-item date-item">
+                            <label>Total Rides</label>
+                            <div class="odometer" id="totalRides">
+                                <span>0</span><span>0</span><span>0</span>
+                            </div>
+                        </div>
+
+                    </div>               
+                         
+                    <!-- Next Button -->
+                    <div class="config-item action-item">
+                        <a href="run.html" class="btn primary next-btn" style="font-size: 1.2rem;">
+                            NEXT
+                        </a>
                     </div>
-                    <div class="table-container">
-                        <table id="profileTable">
-                            <thead>
-                                <tr>
-                                    <th>STEP</th>
-                                    <th>RPM</th>
-                                    <th>DUR(S)</th>
-                                    <th>ABS(S)</th>
-                                    <th>SOUND FILE</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody id="profileBody">
-                                <!-- Generated by JS -->
-                            </tbody>
-                        </table>
-                    </div>
+
                 </div>
             </section>
         </main>
