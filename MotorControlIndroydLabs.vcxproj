@@ -145,6 +145,9 @@
     <Image Include="web\logo.png" />
     <Image Include="web\logox.png" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="miniaudio.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

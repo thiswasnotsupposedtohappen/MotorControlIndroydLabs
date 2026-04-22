@@ -9,19 +9,21 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <setupapi.h>
-#include <mmsystem.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <wrl.h>
 #include <string>
+
+#define MINIAUDIO_IMPLEMENTATION
+#include "miniaudio.h"
+
 #include "webview2_sdk/build/native/include/WebView2.h"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "setupapi.lib")
-#pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -414,6 +416,12 @@ struct AppSettings
 // ============================================================================
 static HWND g_hwnd;
 
+// Audio state
+static ma_engine g_audioEngine;
+static ma_sound g_currentSound;
+static bool g_isAudioEngineInitialized = false;
+static bool g_isSoundLoaded = false;
+
 // WebView2 pointers
 static ComPtr<ICoreWebView2> g_webview;
 static ComPtr<ICoreWebView2Controller> g_controller;
@@ -548,7 +556,8 @@ void SendProfileToWeb()
         // Escape backslashes for JSON
         std::wstring sound_path = wsnd;
         size_t start_pos = 0;
-        while((start_pos = sound_path.find(L"\\", start_pos)) != std::string::npos) {
+        while((start_pos = sound_path.find(L"\\", start_pos)) != std::string::npos) 
+        {
              sound_path.replace(start_pos, 1, L"\\\\");
              start_pos += 2;
         }
@@ -576,8 +585,10 @@ void SetDefaultProfiles()
     settings.difficulty = 0;
     strcpy_s(settings.com_port, sizeof(settings.com_port), "");
 
-    for (int d = 0; d < 2; d++) {
-        for (int i = 0; i < MAX_STEPS; i++) {
+    for (int d = 0; d < 2; d++) 
+    {
+        for (int i = 0; i < MAX_STEPS; i++) 
+        {
             settings.profiles[d][i].motor_rpm = 0;
             settings.profiles[d][i].duration = 0;
             settings.profiles[d][i].sound_file[0] = '\0';
@@ -635,10 +646,10 @@ void BrowseSoundFile(HWND hwnd, int step_index)
     memset(&ofn, 0, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hwnd;
-    ofn.lpstrFilter = L"WAV Files (*.wav)\0*.wav\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter = L"Audio Files (*.wav;*.mp3)\0*.wav;*.mp3\0All Files (*.*)\0*.*\0";
     ofn.lpstrFile = filename;
     ofn.nMaxFile = MAX_PATH;
-    ofn.Flags = OFN_FILEMUSTEXIST;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
     ofn.lpstrDefExt = L"wav";
 
     if (GetOpenFileNameW(&ofn))
@@ -653,7 +664,8 @@ void BrowseSoundFile(HWND hwnd, int step_index)
 
         std::wstring sound_path = filename;
         size_t start_pos = 0;
-        while((start_pos = sound_path.find(L"\\", start_pos)) != std::string::npos) {
+        while((start_pos = sound_path.find(L"\\", start_pos)) != std::string::npos) 
+        {
              sound_path.replace(start_pos, 1, L"\\\\");
              start_pos += 2;
         }
@@ -669,6 +681,62 @@ void BrowseSoundFile(HWND hwnd, int step_index)
 // Program execution
 // ============================================================================
 void StopProgram();
+
+void StopProfileSound()
+{
+    // Stop and uninit any currently playing miniaudio sound
+    if (g_isSoundLoaded)
+    {
+        ma_sound_stop(&g_currentSound);
+        ma_sound_uninit(&g_currentSound);
+        g_isSoundLoaded = false;
+    }
+}
+
+void PlayProfileSound(const char* sound_file)
+{
+    if (sound_file[0] == '\0')
+    {
+        OutputDebugStringA("PlayProfileSound: empty sound_file path, skipping.\n");
+        return;
+    }
+
+    // Check if file exists
+    wchar_t wsnd[MAX_SOUND_PATH];
+    MultiByteToWideChar(CP_ACP, 0, sound_file, -1, wsnd, MAX_SOUND_PATH);
+    if (GetFileAttributesW(wsnd) == INVALID_FILE_ATTRIBUTES)
+    {
+        char dbg[512];
+        sprintf_s(dbg, sizeof(dbg), "PlayProfileSound: file not found: %s\n", sound_file);
+        OutputDebugStringA(dbg);
+        return;
+    }
+
+    StopProfileSound();
+
+    if (!g_isAudioEngineInitialized)
+    {
+        OutputDebugStringA("PlayProfileSound error: miniaudio engine not initialized.\n");
+        return;
+    }
+
+    // Play the sound using miniaudio high level API
+    ma_result result = ma_sound_init_from_file(&g_audioEngine, sound_file, 0, NULL, NULL, &g_currentSound);
+
+    char dbg[512];
+    if (result == MA_SUCCESS)
+    {
+        g_isSoundLoaded = true;
+        ma_sound_start(&g_currentSound);
+        sprintf_s(dbg, sizeof(dbg), "PlayProfileSound: now playing: %s\n", sound_file);
+    }
+    else
+    {
+        sprintf_s(dbg, sizeof(dbg), "PlayProfileSound error: miniaudio failed to load (file: %s)\n", sound_file);
+    }
+
+    OutputDebugStringA(dbg);
+}
 
 void StartProgram()
 {
@@ -694,12 +762,7 @@ void StartProgram()
     
 	motorcontroller.SetRPM(settings.profiles[diff][current_step].motor_rpm);
 
-    if (settings.profiles[diff][current_step].sound_file[0] != '\0')
-    {
-        wchar_t wsnd[MAX_SOUND_PATH];
-        MultiByteToWideChar(CP_ACP, 0, settings.profiles[diff][current_step].sound_file, -1, wsnd, MAX_SOUND_PATH);
-        PlaySoundW(wsnd, NULL, SND_FILENAME | SND_ASYNC);
-    }
+    PlayProfileSound(settings.profiles[diff][current_step].sound_file);
 
     program_running = true;
     program_start_tick = GetTickCount();
@@ -722,6 +785,7 @@ void StopProgram()
 
     program_running = false;
     current_step = 0;
+    StopProfileSound(); // Stop any playing sound
     UpdateStatusDisplay();
 }
 
@@ -745,12 +809,7 @@ void AdvanceToNextStep()
 
 	motorcontroller.SetRPM(settings.profiles[diff][current_step].motor_rpm);
 
-    if (settings.profiles[diff][current_step].sound_file[0] != '\0')
-    {
-        wchar_t wsnd[MAX_SOUND_PATH];
-        MultiByteToWideChar(CP_ACP, 0, settings.profiles[diff][current_step].sound_file, -1, wsnd, MAX_SOUND_PATH);
-        PlaySoundW(wsnd, NULL, SND_FILENAME | SND_ASYNC);
-    }
+    PlayProfileSound(settings.profiles[diff][current_step].sound_file);
 }
 
 void OnProgramTimer()
@@ -813,50 +872,61 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
         }
         UpdateStatusDisplay();
     }
-    else if (message.find(L"\"type\":\"REFRESH_PORTS\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"REFRESH_PORTS\"") != std::string::npos) 
+    {
         SendComPortsToWeb();
     }
-    else if (message.find(L"\"type\":\"START\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"START\"") != std::string::npos) 
+    {
         // Here we would ideally parse the updated profile from the message,
         // but for simplicity, we assume the user saves/updates state regularly or we extract it.
         // Let's assume the Start message includes the profile.
         StartProgram();
     }
-    else if (message.find(L"\"type\":\"STOP\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"STOP\"") != std::string::npos) 
+    {
         StopProgram();
     }
-    else if (message.find(L"\"type\":\"BROWSE_SOUND\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"BROWSE_SOUND\"") != std::string::npos) 
+    {
         size_t pos = message.find(L"\"index\":");
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos) 
+        {
             pos += 8;
             int index = _wtoi(message.substr(pos).c_str());
             BrowseSoundFile(g_hwnd, index);
         }
     }
-    else if (message.find(L"\"type\":\"SET_DIFFICULTY\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"SET_DIFFICULTY\"") != std::string::npos) 
+    {
         size_t pos = message.find(L"\"value\":");
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos) 
+        {
             pos += 8;
             settings.difficulty = _wtoi(message.substr(pos).c_str());
             SaveSettings();
             SendProfileToWeb();
         }
     }
-    else if (message.find(L"\"type\":\"SET_SEATS\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"SET_SEATS\"") != std::string::npos) 
+    {
         size_t pos = message.find(L"\"value\":");
-        if (pos != std::string::npos) {
+        if (pos != std::string::npos) 
+        {
             pos += 8;
             settings.num_seats = _wtoi(message.substr(pos).c_str());
             SaveSettings();
         }
     }
-    else if (message.find(L"\"type\":\"UPDATE_STEP\"") != std::string::npos) {
+    else if (message.find(L"\"type\":\"UPDATE_STEP\"") != std::string::npos) 
+    {
         // Simple extraction of index, field, and value
         size_t idxPos = message.find(L"\"index\":");
         size_t fldPos = message.find(L"\"field\":\"");
         size_t valPos = message.find(L"\"value\":");
 
-        if (idxPos != std::string::npos && fldPos != std::string::npos && valPos != std::string::npos) {
+        if (idxPos != std::string::npos && fldPos != std::string::npos && valPos != std::string::npos) 
+        {
             int index = _wtoi(message.substr(idxPos + 8).c_str());
             int value = _wtoi(message.substr(valPos + 8).c_str());
             
@@ -864,7 +934,8 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
             field = field.substr(0, field.find(L"\""));
 
             int diff = settings.difficulty;
-            if (index >= 0 && index < MAX_STEPS) {
+            if (index >= 0 && index < MAX_STEPS) 
+            {
                 if (field == L"rpm") settings.profiles[diff][index].motor_rpm = value;
                 else if (field == L"duration") settings.profiles[diff][index].duration = value;
                 SaveSettings();
@@ -880,7 +951,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     switch (msg)
     {
     case WM_SIZE:
-        if (g_controller) {
+        if (g_controller) 
+        {
             RECT bounds;
             GetClientRect(hwnd, &bounds);
             g_controller->put_Bounds(bounds);
@@ -893,7 +965,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_CLOSE:
-        if (program_running) {
+        if (program_running) 
+        {
             if (MessageBoxW(hwnd, L"Program is running. Stop and exit?", L"Confirm Exit", MB_YESNO | MB_ICONQUESTION) != IDYES) break;
             StopProgram();
         }
@@ -928,13 +1001,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetDefaultProfiles();
     LoadSettings();
 
+    // Initialize miniaudio
+    if (ma_engine_init(NULL, &g_audioEngine) == MA_SUCCESS)
+    {
+        g_isAudioEngineInitialized = true;
+    }
+
     // Initialize WebView2
     CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr,
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-            [hwnd = g_hwnd](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+            [hwnd = g_hwnd](HRESULT result, ICoreWebView2Environment* env) -> HRESULT 
+            {
                 env->CreateCoreWebView2Controller(hwnd, Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                    [hwnd](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
-                        if (controller != nullptr) {
+                    [hwnd](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT 
+                    {
+                        if (controller != nullptr) 
+                        {
                             g_controller = controller;
                             g_controller->get_CoreWebView2(&g_webview);
                         }
@@ -969,6 +1051,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
+
+    // Cleanup miniaudio
+    StopProfileSound();
+    if (g_isAudioEngineInitialized)
+    {
+        ma_engine_uninit(&g_audioEngine);
+    }
 
     return (int)msg.wParam;
 }
