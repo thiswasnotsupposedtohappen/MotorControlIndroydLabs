@@ -10,6 +10,17 @@ let currentProfile = Array.from({ length: MAX_STEPS }, (_, i) =>
     sound_file: ''
 }));
 
+function getRealStepCount() 
+{
+    let lastRealStep = 0;
+    for (let i = 0; i < currentProfile.length; i++) {
+        if (currentProfile[i].duration > 0) {
+            lastRealStep = i + 1;
+        }
+    }
+    return lastRealStep;
+}
+
 // Initialize UI
 document.addEventListener('DOMContentLoaded', () => 
 {
@@ -20,6 +31,11 @@ document.addEventListener('DOMContentLoaded', () =>
     
     // Initial request for settings and COM ports
     postToCpp({ type: 'GET_INITIAL_DATA' });
+    
+    // If we are on the reports page, request the reports
+    if (document.getElementById('reportsTableBody')) {
+        postToCpp({ type: 'GET_REPORTS' });
+    }
 
     // Load persisted date if available
     const savedDate = localStorage.getItem('selectedDate');
@@ -165,7 +181,22 @@ function setupEventListeners()
             if (document.getElementById('profileTable')) {
                 readProfileFromUI();
             }
-            postToCpp({ type: 'START', profile: currentProfile });
+            let dateStr = "";
+            const savedDate = localStorage.getItem('selectedDate');
+            if (savedDate) {
+                const d = new Date(savedDate);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                dateStr = `${dd}/${mm}/${yyyy}`;
+            } else {
+                const d = new Date();
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                dateStr = `${dd}/${mm}/${yyyy}`;
+            }
+            postToCpp({ type: 'START', profile: currentProfile, date: dateStr });
         });
     }
 
@@ -296,6 +327,32 @@ function handleCppMessage(msg)
         case 'SOUND_SELECTED':
             updateSoundFile(msg.index, msg.path, msg.filename);
             break;
+        case 'REPORTS_DATA':
+            renderReports(msg.logs);
+            break;
+    }
+}
+
+function renderReports(logs) {
+    const tbody = document.getElementById('reportsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No logs found</td></tr>';
+        return;
+    }
+    
+    // Display in reverse chronological order
+    for (let i = logs.length - 1; i >= 0; i--) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${logs[i].date}</td>
+            <td>${logs[i].time}</td>
+            <td>${logs[i].people}</td>
+        `;
+        tbody.appendChild(tr);
     }
 }
 
@@ -360,7 +417,11 @@ function updateStatus(data)
     }
 
     const statusStep = document.getElementById('statusStep');
-    if (statusStep) statusStep.textContent = `${data.currentStep + 1} / 16`;
+    if (statusStep) {
+        const total = getRealStepCount();
+        const current = data.running ? (data.currentStep + 1) : 0;
+        statusStep.textContent = `${current} / ${total}`;
+    }
 
     const btnStart = document.getElementById('btnStart');
     if (btnStart) btnStart.disabled = data.running;

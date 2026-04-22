@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ride Reports</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="program-page">
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="pulse"></span>
+                <h1>Ride Reports</h1>
+                <p>Log of All Cycles</p>
+            </div>
+        </header>
+
+        <main>
+            <section class="profile-panel glass" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="panel-header">
+                    <h3>REPORT LOGS</h3>
+                </div>
+                
+                <div class="table-container" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                    <table class="profile-table">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>TIME</th>
+                                <th>NO. OF PEOPLE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsTableBody">
+                            <tr>
+                                <td colspan="3" style="text-align:center;">Loading logs...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    <a href="main.html" id="btnBack" class="back-btn glass" title="Back to Config">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </a>
+    <script src="script.js"></script>
+</body>
+</html>

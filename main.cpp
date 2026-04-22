@@ -403,6 +403,14 @@ struct ProfileStep
     char sound_file[MAX_SOUND_PATH];
 };
 
+#define MAX_LOGS 1000000
+struct RideLog
+{
+    char date[16];
+    char time[16];
+    int32 num_people;
+};
+
 struct AppSettings
 {
     char com_port[64];
@@ -410,6 +418,9 @@ struct AppSettings
     int32 difficulty;
     int32 total_rides;
     ProfileStep profiles[2][MAX_STEPS];
+    
+    int32 num_logs;
+    RideLog logs[MAX_LOGS];
 };
 
 // ============================================================================
@@ -443,7 +454,9 @@ void SaveSettings()
     fopen_s(&f, "config.bin", "wb");
     if (f)
     {
-        fwrite(&settings, sizeof(AppSettings), 1, f);
+        size_t offset = (char*)&settings.logs - (char*)&settings;
+        size_t size_to_write = offset + settings.num_logs * sizeof(RideLog);
+        fwrite(&settings, 1, size_to_write, f);
         fclose(f);
     }
 }
@@ -454,7 +467,7 @@ void LoadSettings()
     fopen_s(&f, "config.bin", "rb");
     if (f)
     {
-        fread(&settings, sizeof(AppSettings), 1, f);
+        fread(&settings, 1, sizeof(AppSettings), f);
         fclose(f);
     }
 }
@@ -880,21 +893,67 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
     }
     else if (message.find(L"\"type\":\"START\"") != std::string::npos) 
     {
-        // Increment total rides on start
+        std::wstring dateW = L"Unknown";
+        size_t pos = message.find(L"\"date\":\"");
+        if (pos != std::string::npos)
+        {
+            pos += 8;
+            size_t end = message.find(L"\"", pos);
+            if (end != std::string::npos)
+                dateW = message.substr(pos, end - pos);
+        }
+        
+        char dateA[16] = {0};
+        WideCharToMultiByte(CP_ACP, 0, dateW.c_str(), -1, dateA, 15, NULL, NULL);
+
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        char timeA[16] = {0};
+        sprintf_s(timeA, "%02d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
+
+        if (settings.num_logs < MAX_LOGS)
+        {
+            strcpy_s(settings.logs[settings.num_logs].date, dateA);
+            strcpy_s(settings.logs[settings.num_logs].time, timeA);
+            settings.logs[settings.num_logs].num_people = settings.num_seats;
+            settings.num_logs++;
+        }
+        else
+        {
+            memmove(&settings.logs[0], &settings.logs[1], sizeof(RideLog) * (MAX_LOGS - 1));
+            strcpy_s(settings.logs[MAX_LOGS - 1].date, dateA);
+            strcpy_s(settings.logs[MAX_LOGS - 1].time, timeA);
+            settings.logs[MAX_LOGS - 1].num_people = settings.num_seats;
+        }
+
         settings.total_rides++;
         SaveSettings();
         
-        // Notify webview of new total
         SendProfileToWeb();
-
-        // Here we would ideally parse the updated profile from the message,
-        // but for simplicity, we assume the user saves/updates state regularly or we extract it.
-        // Let's assume the Start message includes the profile.
         StartProgram();
     }
     else if (message.find(L"\"type\":\"STOP\"") != std::string::npos) 
     {
         StopProgram();
+    }
+    else if (message.find(L"\"type\":\"GET_REPORTS\"") != std::string::npos) 
+    {
+        std::wstring json = L"{\"type\":\"REPORTS_DATA\",\"logs\":[";
+        int32 start_idx = settings.num_logs > 1000 ? settings.num_logs - 1000 : 0;
+        for (int32 i = start_idx; i < settings.num_logs; i++)
+        {
+            wchar_t wdate[16], wtime[16];
+            MultiByteToWideChar(CP_ACP, 0, settings.logs[i].date, -1, wdate, 16);
+            MultiByteToWideChar(CP_ACP, 0, settings.logs[i].time, -1, wtime, 16);
+            
+            wchar_t log_json[256];
+            _snwprintf_s(log_json, 256, L"{\"date\":\"%s\",\"time\":\"%s\",\"people\":%d}%s",
+                wdate, wtime, settings.logs[i].num_people,
+                (i == settings.num_logs - 1) ? L"" : L",");
+            json += log_json;
+        }
+        json += L"]}";
+        if (g_webview) g_webview->PostWebMessageAsJson(json.c_str());
     }
     else if (message.find(L"\"type\":\"BROWSE_SOUND\"") != std::string::npos) 
     {
