@@ -426,6 +426,31 @@ static DWORD program_start_tick = 0;
 static DWORD step_start_tick = 0;
 
 // ============================================================================
+// Helper: Configuration Persistence
+// ============================================================================
+void SaveSettings()
+{
+    FILE* f = NULL;
+    fopen_s(&f, "config.bin", "wb");
+    if (f)
+    {
+        fwrite(&settings, sizeof(AppSettings), 1, f);
+        fclose(f);
+    }
+}
+
+void LoadSettings()
+{
+    FILE* f = NULL;
+    fopen_s(&f, "config.bin", "rb");
+    if (f)
+    {
+        fread(&settings, sizeof(AppSettings), 1, f);
+        fclose(f);
+    }
+}
+
+// ============================================================================
 // Helper: COM port enumeration
 // ============================================================================
 struct ComPortInfo
@@ -436,6 +461,7 @@ struct ComPortInfo
 
 static ComPortInfo g_com_ports[64];
 static int g_com_port_count = 0;
+
 
 void EnumerateComPorts()
 {
@@ -635,6 +661,7 @@ void BrowseSoundFile(HWND hwnd, int step_index)
         _snwprintf_s(json, 1024, L"{\"type\":\"SOUND_SELECTED\",\"index\":%d,\"path\":\"%s\",\"filename\":\"%s\"}",
             step_index, sound_path.c_str(), name_only);
         g_webview->PostWebMessageAsJson(json);
+        SaveSettings();
     }
 }
 
@@ -779,6 +806,7 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
                 if (motorcontroller.Initialize(portA) == 0)
                 {
                     strcpy_s(settings.com_port, sizeof(settings.com_port), portA);
+                    SaveSettings();
                     SetTimer(g_hwnd, TIMER_STATUS, TIMER_STATUS_MS, NULL);
                 }
             }
@@ -810,6 +838,7 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
         if (pos != std::string::npos) {
             pos += 8;
             settings.difficulty = _wtoi(message.substr(pos).c_str());
+            SaveSettings();
             SendProfileToWeb();
         }
     }
@@ -818,45 +847,31 @@ HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageRecei
         if (pos != std::string::npos) {
             pos += 8;
             settings.num_seats = _wtoi(message.substr(pos).c_str());
+            SaveSettings();
         }
     }
-    else if (message.find(L"\"type\":\"SAVE\"") != std::string::npos) {
-        // Manual save trigger
-        OPENFILENAMEW ofn;
-        wchar_t filename[MAX_PATH] = L"profile.bin";
-        memset(&ofn, 0, sizeof(ofn));
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = g_hwnd;
-        ofn.lpstrFilter = L"Binary Files (*.bin)\0*.bin\0All Files (*.*)\0*.*\0";
-        ofn.lpstrFile = filename;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.Flags = OFN_OVERWRITEPROMPT;
-        ofn.lpstrDefExt = L"bin";
+    else if (message.find(L"\"type\":\"UPDATE_STEP\"") != std::string::npos) {
+        // Simple extraction of index, field, and value
+        size_t idxPos = message.find(L"\"index\":");
+        size_t fldPos = message.find(L"\"field\":\"");
+        size_t valPos = message.find(L"\"value\":");
 
-        if (GetSaveFileNameW(&ofn)) {
-            FILE* f = NULL;
-            _wfopen_s(&f, filename, L"wb");
-            if (f) { fwrite(&settings, sizeof(AppSettings), 1, f); fclose(f); }
-        }
-    }
-    else if (message.find(L"\"type\":\"LOAD\"") != std::string::npos) {
-        OPENFILENAMEW ofn;
-        wchar_t filename[MAX_PATH] = L"";
-        memset(&ofn, 0, sizeof(ofn));
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = g_hwnd;
-        ofn.lpstrFilter = L"Binary Files (*.bin)\0*.bin\0All Files (*.*)\0*.*\0";
-        ofn.lpstrFile = filename;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.Flags = OFN_FILEMUSTEXIST;
-        ofn.lpstrDefExt = L"bin";
+        if (idxPos != std::string::npos && fldPos != std::string::npos && valPos != std::string::npos) {
+            int index = _wtoi(message.substr(idxPos + 8).c_str());
+            int value = _wtoi(message.substr(valPos + 8).c_str());
+            
+            std::wstring field = message.substr(fldPos + 9);
+            field = field.substr(0, field.find(L"\""));
 
-        if (GetOpenFileNameW(&ofn)) {
-            FILE* f = NULL;
-            _wfopen_s(&f, filename, L"rb");
-            if (f) { fread(&settings, sizeof(AppSettings), 1, f); fclose(f); SendProfileToWeb(); }
+            int diff = settings.difficulty;
+            if (index >= 0 && index < MAX_STEPS) {
+                if (field == L"rpm") settings.profiles[diff][index].motor_rpm = value;
+                else if (field == L"duration") settings.profiles[diff][index].duration = value;
+                SaveSettings();
+            }
         }
     }
+    
 
     return S_OK;
 }
@@ -911,6 +926,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     if (!g_hwnd) return 1;
 
     SetDefaultProfiles();
+    LoadSettings();
 
     // Initialize WebView2
     CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr,

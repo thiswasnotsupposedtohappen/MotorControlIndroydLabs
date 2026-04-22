@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta MS300 VFD Execution</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="run-page">
+    <div class="app-container">
+        <main>
+            <!-- Telemetry Section -->
+            <section class="telemetry-grid">
+                <div class="telemetry-card glass rpm-card">
+                    <div class="label">MOTOR RPM</div>
+                    <div class="value-container">
+                        <span id="valRpm" class="value">0.00</span>
+                        <span class="unit">RPM</span>
+                    </div>
+                    <!-- <div class="gauge-bar"><div id="gaugeRpm" class="fill"></div></div> -->
+                </div>
+                <div class="telemetry-card glass current-card">
+                    <div class="label">CURRENT</div>
+                    <div class="value-container">
+                        <span id="valCurrent" class="value">0.00</span>
+                        <span class="unit">A</span>
+                    </div>
+                    <!-- <div class="gauge-bar"><div id="gaugeCurrent" class="fill"></div></div> -->
+                </div>
+                <div class="telemetry-card glass voltage-card">
+                    <div class="label">VOLTAGE</div>
+                    <div class="value-container">
+                        <span id="valVoltage" class="value">0.00</span>
+                        <span class="unit">V</span>
+                    </div>
+                    <!-- <div class="gauge-bar"><div id="gaugeVoltage" class="fill"></div></div> -->
+                </div>
+                <div class="telemetry-card glass status-card">
+                    <div class="status-row">
+                        <span class="label">CONNECTION</span>
+                        <span id="statusConn" class="status-indicator disconnected">DISCONNECTED</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">PROGRAM</span>
+                        <span id="statusProg" class="status-indicator stopped">STOPPED</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">CURRENT STEP</span>
+                        <span id="statusStep" class="value-sm">0 / 16</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Big Timer Section -->
+            <section class="timer-section">
+                <div class="timer-display glass">
+                    <div id="bigTimer" class="timer-value">00:00</div>
+                    <div class="timer-label">ELAPSED TIME</div>
+                </div>
+            </section>
+
+            <!-- Controls Section -->
+            <section class="run-controls">
+                <div class="action-buttons horizontal glass">
+                    <button id="btnStart" class="btn primary extra-large glow">START CYCLE</button>
+                    <button id="btnStop" class="btn danger extra-large glow" disabled>EMERGENCY STOP</button>
+                    <a href="main.html" id="btnBack" class="btn secondary">BACK TO CONFIG</a>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

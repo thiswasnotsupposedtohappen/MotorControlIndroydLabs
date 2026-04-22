@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading System...</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .splash-container {
+            text-align: center;
+        }
+
+        .logo-img {
+            max-width: 300px;
+            height: auto;
+        }
+
+        /* Loading Bar */
+        .loader-bar {
+            position: absolute;
+            bottom: 10vh;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70vw;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            border-radius: 2px;
+        }
+
+        .loader-fill {
+            position: absolute;
+            height: 100%;
+            width: 0%;
+            background: #00f2ff;
+            box-shadow: 0 0 10px #00f2ff;
+            animation: load 5s linear forwards;
+        }
+
+        @keyframes load {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="splash-container">
+        <img src="logo.png" alt="Company Logo" class="logo-img">
+        <div class="loader-bar">
+            <div class="loader-fill"></div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION: Adjust splash screen duration here
+        const SPLASH_DURATION = 5000; // Time in milliseconds (3000 = 3 seconds)
+
+        setTimeout(() => {
+            window.location.href = 'main.html';
+        }, SPLASH_DURATION);
+    </script>
+</body>
+</html>

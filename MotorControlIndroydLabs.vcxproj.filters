@@ -32,5 +32,25 @@
     <None Include="web\style.css">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="web\login.js">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="web\main.html">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="web\run.html">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="web\splash.html">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="web\logo.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="web\logox.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

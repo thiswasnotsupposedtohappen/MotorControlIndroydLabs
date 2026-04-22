@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta MS300 VFD Control Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="pulse"></span>
+                <h1>Human Gyro Control Panel</h1>
+                <p>Wwaaaaaooooooooohhhhhh!</p>
+            </div>
+            <div class="connection-panel glass">
+                <div class="input-group">
+                    <label>COM PORT</label>
+                    <select id="comPort" style="min-width:100px;">
+                        <option value="">Scanning...</option>
+                    </select>
+                </div>
+                <button id="btnConnect" class="btn secondary">CONNECT</button>
+                <button id="btnRefresh" class="btn icon" title="Refresh COM Ports">⟳</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="telemetry-grid">
+                <div class="telemetry-card glass rpm-card">
+                    <div class="label">MOTOR RPM</div>
+                    <div class="value-container">
+                        <span id="valRpm" class="value">0.00</span>
+                        <span class="unit">RPM</span>
+                    </div>
+                    <!--<div class="gauge-bar"><div id="gaugeRpm" class="fill"></div></div>-->
+                </div>
+                <div class="telemetry-card glass current-card">
+                    <div class="label">CURRENT</div>
+                    <div class="value-container">
+                        <span id="valCurrent" class="value">0.00</span>
+                        <span class="unit">A</span>
+                    </div>
+                    <!--<div class="gauge-bar"><div id="gaugeCurrent" class="fill"></div></div>-->
+                </div>
+                <div class="telemetry-card glass voltage-card">
+                    <div class="label">VOLTAGE</div>
+                    <div class="value-container">
+                        <span id="valVoltage" class="value">0.00</span>
+                        <span class="unit">V</span>
+                    </div>
+                    <!--<div class="gauge-bar"><div id="gaugeVoltage" class="fill"></div></div>-->
+                </div>
+                <div class="telemetry-card glass status-card">
+                    <div class="status-row">
+                        <span class="label">CONNECTION</span>
+                        <span id="statusConn" class="status-indicator disconnected">DISCONNECTED</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">PROGRAM</span>
+                        <span id="statusProg" class="status-indicator stopped">STOPPED</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">ELAPSED TIME</span>
+                        <span id="statusTime" class="value-sm">0 s</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">CURRENT STEP</span>
+                        <span id="statusStep" class="value-sm">0 / 16</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="controls-config-grid">
+                <div class="config-panel glass">
+                    <h3>SYSTEM CONFIGURATION</h3>
+                    <div class="config-row">
+                        <div class="input-group">
+                            <label>NO. OF SEATS</label>
+                            <select id="numSeats">
+                                <option value="1">1 Seat</option>
+                                <option value="2">2 Seats</option>
+                                <option value="3">3 Seats</option>
+                                <option value="4">4 Seats</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>DIFFICULTY</label>
+                            <select id="difficulty">
+                                <option value="0">EASY MODE</option>
+                                <option value="1">HARD MODE</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <a href="run.html" class="btn primary large">NEXT</a>
+                    </div>
+                </div>
+
+                <div class="profile-panel glass">
+                    <div class="panel-header">
+                        <h3>MOTION PROFILE</h3>
+                        <span class="badge">16 STEPS</span>
+                    </div>
+                    <div class="table-container">
+                        <table id="profileTable">
+                            <thead>
+                                <tr>
+                                    <th>STEP</th>
+                                    <th>RPM</th>
+                                    <th>DUR(S)</th>
+                                    <th>ABS(S)</th>
+                                    <th>SOUND FILE</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="profileBody">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -134,8 +134,16 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="web\index.html" />
+    <None Include="web\login.js" />
+    <None Include="web\main.html" />
+    <None Include="web\run.html" />
     <None Include="web\script.js" />
+    <None Include="web\splash.html" />
     <None Include="web\style.css" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="web\logo.png" />
+    <Image Include="web\logox.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
