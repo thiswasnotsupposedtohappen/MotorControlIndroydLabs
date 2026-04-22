@@ -48,3 +48,6 @@ VFD stop  write command: address 0x2000 value (BIT00)
 VFD freq write command: address 0x2001 value frequency in Hz * 100 (for example for 50Hz you will write 5000)
 VFD freq read command: address 0x2103 value will be frequency in Hz * 100 (for example for 50Hz it will return 5000)
 VFD current read command: address 0x2104 (this will return the current in amps * 100)
+
+Next TODO:
+I want to port this entire application to Webview2. I want to upgrade it from the old native win32 api to modern looking application.

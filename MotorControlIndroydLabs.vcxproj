@@ -132,6 +132,11 @@
   <ItemGroup>
     <Text Include="TODO.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="web\index.html" />
+    <None Include="web\script.js" />
+    <None Include="web\style.css" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

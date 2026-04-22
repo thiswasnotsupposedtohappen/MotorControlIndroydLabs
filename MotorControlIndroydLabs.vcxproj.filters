@@ -22,4 +22,15 @@
   <ItemGroup>
     <Text Include="TODO.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="web\index.html">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="web\script.js">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="web\style.css">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>
