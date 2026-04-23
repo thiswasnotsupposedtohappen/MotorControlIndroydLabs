@@ -37,13 +37,12 @@ body {
 }
 
 .app-container {
-    width: 95vw;
-    height: 95vh;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     gap: 20px;
     padding: 20px;
-    padding-bottom: 0;
 }
 
 .glass {
@@ -68,14 +67,14 @@ header {
 
 .logo h1 {
     font-family: var(--font-header);
-    font-size: 1.8rem;
+    font-size: 4rem;
     letter-spacing: 2px;
     color: var(--primary);
     text-shadow: 0 0 10px var(--primary-glow);
 }
 
 .logo p {
-    font-size: 0.8rem;
+    font-size: 2rem;
     letter-spacing: 4px;
     color: var(--text-dim);
 }
@@ -107,8 +106,8 @@ header {
 /* Main Grid */
 main {
     flex: 1;
-    display: grid;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
     overflow: hidden;
 }
@@ -213,18 +212,21 @@ main {
 .main-content-area .config-panel 
 {
     width: 100%;
+    flex: 1;
     padding: 30px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    position: relative;
 }
 
 .config-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto 1fr;
-    gap: 30px;
+    gap: max(5vw, 5vh);
     height: 100%;
+    padding: max(5vw, 5vh);
 }
 
 .config-panel {
@@ -253,28 +255,30 @@ main {
 
 .config-item label {
     font-family: var(--font-header);
-    font-size: 1.2rem;
+    font-size: 3rem;
     color: var(--text-main);
     letter-spacing: 2px;
 }
 
 /* Button Group */
-.button-group {
+.button-group 
+{
     display: flex;
-    gap: 15px;
+    gap: max(3vw, 3vh);
 }
 
-.btn-toggle {
+.btn-toggle 
+{
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     color: var(--text-main);
     padding: 15px 30px;
     border-radius: 12px;
     font-family: var(--font-header);
-    font-size: 1.1rem;
+    font-size: 3rem;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    min-width: 80px;
+    min-width: 5vw;
 }
 
 .btn-toggle:hover {
@@ -331,13 +335,15 @@ main {
     transition: all 0.3s ease;
 }
 
-.date-card:hover {
+.date-card:hover 
+{
     background: rgba(255, 255, 255, 0.15);
     border-color: var(--primary);
     box-shadow: 0 0 15px var(--primary-glow);
 }
 
-.rides-card {
+.rides-card 
+{
     padding: 15px;
     border-radius: 15px;
     background: rgba(255, 255, 255, 0.03);
@@ -366,14 +372,14 @@ main {
 }
 
 #displayDay {
-    font-size: 1.2rem;
+    font-size: 3rem;
     color: var(--text-dim);
     margin-bottom: 5px;
 }
 
 #displayDate {
     font-family: var(--font-header);
-    font-size: 1.5rem;
+    font-size:3rem;
     color: var(--text-main);
 }
 
@@ -400,18 +406,12 @@ main {
 {
     position: absolute;
     bottom: 20px;
-    left: calc(50% - 150px);
-    width: 300px;
-    height: 60px;
+    left: calc(50% - 200px);
+    width: 400px;
+    height: 80px;
     padding: 20px 60px;
     border-radius: 15px;
     text-decoration: none;
-}
-
-.next-btn .arrow 
-{
-    margin-left: 15px;
-    font-size: 1.8rem;
 }
 
 select, input 
@@ -515,6 +515,7 @@ select, input
     flex: 1;
     overflow-y: auto;
     padding-right: 5px;
+    font-size: 2rem;
 }
 
 .table-container::-webkit-scrollbar { width: 6px; }
@@ -528,7 +529,7 @@ table {
 th {
     text-align: left;
     padding: 10px;
-    font-size: 0.7rem;
+    font-size: 2rem;
     color: var(--text-dim);
     border-bottom: 1px solid var(--glass-border);
 }
@@ -627,6 +628,7 @@ td {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex: 1;
 }
 
 .timer-display {
@@ -734,3 +736,24 @@ tr.active-step {
     background: rgba(0, 242, 255, 0.1);
 }
 
+#btnRefresh
+{
+    font-size: 2rem;
+    height: 5vh;
+    width: 3vw;
+}
+
+.connection-panel
+{
+    font-size: 2rem;;
+}
+
+#comPort
+{
+    font-size: 1.5rem;
+}
+
+#profileBody input
+{
+    font-size: 1.2rem;
+}
