@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <wrl.h>
 #include <string>
+#include "web_resources.h"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -26,7 +27,6 @@
 #pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "webview2_sdk/build/native/x64/WebView2Loader.dll.lib")
 #pragma comment(linker, "/SUBSYSTEM:WINDOWS")
 using namespace Microsoft::WRL;
@@ -438,6 +438,9 @@ static bool g_isSoundLoaded = false;
 static ComPtr<ICoreWebView2> g_webview;
 static ComPtr<ICoreWebView2Controller> g_controller;
 
+// Temp directory for extracted web resources (cleaned up on exit)
+static wchar_t g_tempWebDir[MAX_PATH] = {0};
+
 static AppSettings settings;
 
 static bool program_running = false;
@@ -839,6 +842,69 @@ void OnProgramTimer()
 }
 
 // ============================================================================
+// Extract embedded web resources to temp directory
+// Files are re-extracted from the exe every launch (tamper-proof)
+// ============================================================================
+static void WriteResourceFile(const wchar_t* dir, const wchar_t* filename, const void* data, size_t len)
+{
+    wchar_t path[MAX_PATH];
+    _snwprintf_s(path, MAX_PATH, L"%s\\%s", dir, filename);
+    HANDLE hFile = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        DWORD written;
+        WriteFile(hFile, data, (DWORD)len, &written, NULL);
+        CloseHandle(hFile);
+    }
+}
+
+void ExtractWebResources()
+{
+    // Create a temp directory with a random name
+    wchar_t tempBase[MAX_PATH];
+    GetTempPathW(MAX_PATH, tempBase);
+    
+    // Use a unique subfolder name based on process ID and tick count
+    _snwprintf_s(g_tempWebDir, MAX_PATH, L"%s_mcweb_%u_%u", tempBase, GetCurrentProcessId(), GetTickCount());
+    CreateDirectoryW(g_tempWebDir, NULL);
+    
+    // Extract all text resources
+    WriteResourceFile(g_tempWebDir, L"index.html",   WebResources::index_html,   WebResources::index_html_len);
+    WriteResourceFile(g_tempWebDir, L"splash.html",  WebResources::splash_html,  WebResources::splash_html_len);
+    WriteResourceFile(g_tempWebDir, L"main.html",    WebResources::main_html,    WebResources::main_html_len);
+    WriteResourceFile(g_tempWebDir, L"program.html", WebResources::program_html, WebResources::program_html_len);
+    WriteResourceFile(g_tempWebDir, L"reports.html", WebResources::reports_html,  WebResources::reports_html_len);
+    WriteResourceFile(g_tempWebDir, L"run.html",     WebResources::run_html,     WebResources::run_html_len);
+    WriteResourceFile(g_tempWebDir, L"style.css",    WebResources::style_css,    WebResources::style_css_len);
+    WriteResourceFile(g_tempWebDir, L"script.js",    WebResources::script_js,    WebResources::script_js_len);
+    WriteResourceFile(g_tempWebDir, L"login.js",     WebResources::login_js,     WebResources::login_js_len);
+    
+    // Extract binary resources
+    WriteResourceFile(g_tempWebDir, L"logo.png",  WebResources::logo_png_data,  WebResources::logo_png_size);
+    WriteResourceFile(g_tempWebDir, L"logo.jpeg", WebResources::logo_jpeg_data, WebResources::logo_jpeg_size);
+}
+
+void CleanupWebResources()
+{
+    if (g_tempWebDir[0] == L'\0') return;
+    
+    // Delete all files in the temp directory
+    const wchar_t* files[] = {
+        L"index.html", L"splash.html", L"main.html", L"program.html",
+        L"reports.html", L"run.html", L"style.css", L"script.js",
+        L"login.js", L"logo.png", L"logo.jpeg"
+    };
+    for (int i = 0; i < _countof(files); i++)
+    {
+        wchar_t path[MAX_PATH];
+        _snwprintf_s(path, MAX_PATH, L"%s\\%s", g_tempWebDir, files[i]);
+        DeleteFileW(path);
+    }
+    RemoveDirectoryW(g_tempWebDir);
+    g_tempWebDir[0] = L'\0';
+}
+
+// ============================================================================
 // Win32
 // ============================================================================
 HRESULT OnWebMessageReceived(ICoreWebView2* sender, ICoreWebView2WebMessageReceivedEventArgs* args)
@@ -1069,6 +1135,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetDefaultProfiles();
     LoadSettings();
 
+    // Extract embedded web resources to temp directory
+    ExtractWebResources();
+
     // Initialize miniaudio
     if (ma_engine_init(NULL, &g_audioEngine) == MA_SUCCESS)
     {
@@ -1101,12 +1170,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
                         g_webview->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(OnWebMessageReceived).Get(), nullptr);
 
-                        // Load index.html
-                        wchar_t path[MAX_PATH];
-                        GetCurrentDirectoryW(MAX_PATH, path);
+                        // Navigate to extracted temp files (identical perf to original file:// approach)
                         std::wstring url = L"file:///";
-                        url += path;
-                        url += L"\\web\\index.html";
+                        url += g_tempWebDir;
+                        url += L"\\index.html";
                         g_webview->Navigate(url.c_str());
 
                         return S_OK;
@@ -1126,6 +1193,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     {
         ma_engine_uninit(&g_audioEngine);
     }
+
+    // Cleanup temp web resources
+    CleanupWebResources();
 
     return (int)msg.wParam;
 }
